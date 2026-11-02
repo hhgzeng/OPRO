@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local secrets and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+.workbuddy
+
+# Test and experiment outputs
+.pytest_cache/
+outputs/
+runs/
