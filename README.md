@@ -4,7 +4,7 @@
 
 代码、benchmark 数据及提示词历史来自 Google DeepMind 官方仓库 [google-deepmind/opro](https://github.com/google-deepmind/opro)，对应提交 `a76bdce2cbf6d4a0d1e570a6fcfe17be9c2abdd7`。本仓库补充了 `uv` 环境管理、复现约束和中文使用说明。
 
-> 注意：官方代码使用 2023 年的 PaLM/text-bison 和旧版 OpenAI 接口。仓库当前保留原始调用方式，尚未迁移到新的模型 API；运行前需确认账号仍能访问相应模型，或先适配 `opro/prompt_utils.py`。
+> 注意：官方代码使用 2023 年的 PaLM/text-bison 和旧版 OpenAI SDK。论文使用的 text-bison-001、PaLM 2、gpt-3.5-turbo 均已下线，本仓库已放开模型白名单（任何非 `text-bison` 的模型名都走 OpenAI 兼容接口），因此只能做**模型替代复现**。分阶段复现计划见 [REPRODUCTION_PLAN.md](REPRODUCTION_PLAN.md)。
 
 ## 环境要求
 
@@ -102,7 +102,7 @@ Step 4, training acc: 0.780, instruction: Find a movie similar to the following 
 
 ## 运行实验
 
-以下命令展示官方入口。API Key 不要写入代码或提交到 Git；示例先从终端读入环境变量。
+以下命令展示官方入口。API Key 不要写入代码或提交到 Git；示例先从终端读入环境变量。命令里的 `gpt-4` / `gpt-3.5-turbo` 只是占位，实际请填写你账号可用的模型名（如 `gpt-4o-mini`、`deepseek-chat`），并通过 `OPENAI_API_BASE` 指向对应端点。
 
 ```bash
 read -rsp "OpenAI API key: " OPENAI_API_KEY; echo
