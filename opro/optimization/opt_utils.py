@@ -58,13 +58,29 @@ def gen_ins_and_score_pairs_substr(
     max_num_instructions=1000,
     return_str_only=False,
     num_score_buckets=np.inf,
+    instruction_order="ascending",
+    show_scores=True,
 ):
     """Generate the string that includes instruction-score pairs."""
     assert num_score_buckets == np.inf or isinstance(num_score_buckets, int)
+    assert instruction_order in {"ascending", "descending", "random"}
     old_instructions_and_scores_str = ""
-    old_instructions_and_scores = sorted(
-        old_instructions_and_scores, key=lambda x: x[1]
-    )[-max_num_instructions:]
+    if instruction_order == "ascending":
+        old_instructions_and_scores = sorted(
+            old_instructions_and_scores, key=lambda x: x[1]
+        )[-max_num_instructions:]
+    elif instruction_order == "descending":
+        old_instructions_and_scores = sorted(
+            old_instructions_and_scores, key=lambda x: x[1], reverse=True
+        )[:max_num_instructions]
+    else:
+        top_candidates = sorted(
+            old_instructions_and_scores, key=lambda x: x[1]
+        )[-max_num_instructions:]
+        top_candidates = list(top_candidates)
+        np.random.shuffle(top_candidates)
+        old_instructions_and_scores = top_candidates
+
     old_instructions_and_scores_in_meta_prompt = []
     for instruction, score, i_step in old_instructions_and_scores:
         if (
@@ -74,13 +90,18 @@ def gen_ins_and_score_pairs_substr(
             old_instructions_and_scores_in_meta_prompt.append(
                 (instruction, score, i_step)
             )
-            if num_score_buckets == np.inf:
-                score_to_show = round(score, 3)
+            if show_scores:
+                if num_score_buckets == np.inf:
+                    score_to_show = round(score, 3)
+                else:
+                    score_to_show = _bucketize_float(score, num_score_buckets)  # type: ignore
+                old_instructions_and_scores_str += (
+                    f"\ntext:\n{instruction}\nscore:\n{score_to_show}\n"
+                )
             else:
-                score_to_show = _bucketize_float(score, num_score_buckets)  # type: ignore
-            old_instructions_and_scores_str += (
-                f"\ntext:\n{instruction}\nscore:\n{score_to_show}\n"
-            )
+                old_instructions_and_scores_str += (
+                    f"\ntext:\n{instruction}\n"
+                )
     if return_str_only:
         return old_instructions_and_scores_str
     else:
@@ -105,6 +126,8 @@ def gen_meta_prompt(
     num_score_buckets=np.inf,
     dataset_name="",
     task_name="",
+    instruction_order="ascending",
+    show_scores=True,
 ):
     """Generate meta prompt for instruction rewriting.
 
@@ -165,24 +188,41 @@ def gen_meta_prompt(
     if meta_prompt_type == "both_instructions_and_exemplars":
         if optimizer_llm_name.lower() != "text-bison":
             if instruction_pos == "A_begin":
+                if show_scores:
+                    meta_prompt_old_instruction_part = (
+                        "Your task is to generate the answer starting sentence <Start>."
+                        " Below are some previous starting sentences with their scores."
+                        " The score ranges from 0 to 100.\n"
+                    )
+                else:
+                    meta_prompt_old_instruction_part = (
+                        "Your task is to generate the answer starting sentence <Start>."
+                        " Below are some previous starting sentences.\n"
+                    )
+            else:
+                if show_scores:
+                    meta_prompt_old_instruction_part = (
+                        "Your task is to generate the instruction <INS>."
+                        " Below are some previous instructions with their scores."
+                        " The score ranges from 0 to 100.\n"
+                    )
+                else:
+                    meta_prompt_old_instruction_part = (
+                        "Your task is to generate the instruction <INS>."
+                        " Below are some previous instructions.\n"
+                    )
+        else:
+            assert optimizer_llm_name.lower() == "text-bison"
+            if show_scores:
                 meta_prompt_old_instruction_part = (
-                    "Your task is to generate the answer starting sentence <Start>."
-                    " Below are some previous starting sentences with their scores."
-                    " The score ranges from 0 to 100.\n"
+                    "I have some texts along with their corresponding scores."
+                    " The texts are arranged in ascending order based on their scores,"
+                    " where higher scores indicate better quality.\n\n"
                 )
             else:
                 meta_prompt_old_instruction_part = (
-                    "Your task is to generate the instruction <INS>."
-                    " Below are some previous instructions with their scores."
-                    " The score ranges from 0 to 100.\n"
+                    "I have some texts.\n\n"
                 )
-        else:
-            assert optimizer_llm_name.lower() == "text-bison"
-            meta_prompt_old_instruction_part = (
-                "I have some texts along with their corresponding scores."
-                " The texts are arranged in ascending order based on their scores,"
-                " where higher scores indicate better quality.\n\n"
-            )
         # add old instructions
         old_instructions_and_scores_str = gen_ins_and_score_pairs_substr(
             old_instructions_and_scores=old_instructions_and_scores,
@@ -190,6 +230,8 @@ def gen_meta_prompt(
             max_num_instructions=max_num_instructions,
             return_str_only=True,
             num_score_buckets=num_score_buckets,
+            instruction_order=instruction_order,
+            show_scores=show_scores,
         )
         meta_prompt_old_instruction_part += old_instructions_and_scores_str  # type: ignore
         # add QA pairs if few_shot_qa_pairs == True
@@ -414,6 +456,10 @@ def run_evolution(**kwargs):
     num_few_shot_questions_for_instruction_refinement = kwargs[
         "num_few_shot_questions_for_instruction_refinement"
     ]
+    if num_few_shot_questions_for_instruction_refinement == 0:
+        few_shot_qa_pairs = False
+    instruction_order = kwargs.get("instruction_order", "ascending")
+    show_scores = kwargs.get("show_scores", True)
     evaluate_old_ins_on_few_shot = kwargs["evaluate_old_ins_on_few_shot"]
     eval_interval = kwargs["eval_interval"]
     save_folder = kwargs["save_folder"]
@@ -440,6 +486,9 @@ def run_evolution(**kwargs):
         optimizer_llm_temperature_schedule
     )
     configs_dict["optimizer_llm_temperature_end"] = optimizer_llm_temperature_end
+    configs_dict["instruction_order"] = instruction_order
+    configs_dict["show_scores"] = show_scores
+    configs_dict["num_exemplars"] = num_few_shot_questions_for_instruction_refinement
     with open(os.path.join(save_folder, "configs_dict.json"), "w") as f:
         json.dump(configs_dict, f, indent=4)
 
@@ -721,6 +770,8 @@ def run_evolution(**kwargs):
                 num_score_buckets=num_score_buckets,
                 dataset_name=dataset_name,
                 task_name=task_name,
+                instruction_order=instruction_order,
+                show_scores=show_scores,
             )
 
         else:  # no few-shot exemplars in meta-prompt
@@ -738,6 +789,8 @@ def run_evolution(**kwargs):
                 num_score_buckets=num_score_buckets,
                 dataset_name=dataset_name,
                 task_name=task_name,
+                instruction_order=instruction_order,
+                show_scores=show_scores,
             )
         print(f"\nmeta_prompt: \n\n{meta_prompt}\n")
         meta_prompts.append((meta_prompt, i_step))

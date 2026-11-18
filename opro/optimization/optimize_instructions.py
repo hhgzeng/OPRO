@@ -46,6 +46,11 @@ import functools
 import os
 import sys
 
+OPRO_ROOT_PATH = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+)
+sys.path.insert(0, OPRO_ROOT_PATH)
+
 import google.generativeai as palm
 import numpy as np
 import openai
@@ -55,11 +60,6 @@ from absl import app, flags
 from opro import prompt_utils
 from opro.evaluation import eval_utils
 from opro.optimization import opt_utils
-
-OPRO_ROOT_PATH = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-)
-sys.path.insert(0, OPRO_ROOT_PATH)
 
 ROOT_DATA_FOLDER_PATH = os.path.join(OPRO_ROOT_PATH, "data")
 
@@ -117,6 +117,30 @@ _MAX_TRAIN_SAMPLES = flags.DEFINE_integer(
     "max_train_samples",
     0,
     "If > 0, limit train set size for smoke testing.",
+)
+
+_OPTIMIZER_TEMPERATURE = flags.DEFINE_float(
+    "optimizer_temperature",
+    1.0,
+    "The temperature for the optimizer LLM.",
+)
+
+_INSTRUCTION_ORDER = flags.DEFINE_string(
+    "instruction_order",
+    "ascending",
+    "The order of previous instructions in meta-prompt: ascending, descending, or random.",
+)
+
+_SHOW_SCORES = flags.DEFINE_boolean(
+    "show_scores",
+    True,
+    "Whether to show scores in the meta-prompt.",
+)
+
+_NUM_EXEMPLARS = flags.DEFINE_integer(
+    "num_exemplars",
+    3,
+    "The number of few-shot exemplars in the meta-prompt (0 for none).",
 )
 
 
@@ -363,7 +387,7 @@ def main(_):
     else:
         assert optimizer_llm_name != "text-bison"
         optimizer_gpt_max_decode_steps = 512
-        optimizer_gpt_temperature = 1.0
+        optimizer_gpt_temperature = _OPTIMIZER_TEMPERATURE.value
 
         optimizer_llm_dict = dict()
         optimizer_llm_dict["max_decode_steps"] = optimizer_gpt_max_decode_steps
@@ -730,7 +754,7 @@ def main(_):
 
     optimizer_llm_temperature = optimizer_llm_dict["temperature"]
 
-    num_few_shot_questions_for_instruction_refinement = 3
+    num_few_shot_questions_for_instruction_refinement = _NUM_EXEMPLARS.value
 
     # To change the number of generated instructions in each step, one should
     # edit the value of the variable below, instead of editing the number of
@@ -744,7 +768,7 @@ def main(_):
         # "",
         # "The answer is",
     ]
-    few_shot_qa_pairs = True
+    few_shot_qa_pairs = _NUM_EXEMPLARS.value > 0
     # one of {'accumulative_most_frequent', 'current_most_frequent', 'random',
     # 'constant'}
     few_shot_selection_criteria = "random"
@@ -826,6 +850,8 @@ def main(_):
         "evaluate_old_ins_on_few_shot": evaluate_old_ins_on_few_shot,
         "eval_interval": eval_interval,
         "save_folder": save_folder,
+        "instruction_order": _INSTRUCTION_ORDER.value,
+        "show_scores": _SHOW_SCORES.value,
     }
 
     opt_utils.run_evolution(**evolution_kwargs)

@@ -33,17 +33,17 @@ import os
 import re
 import sys
 
+OPRO_ROOT_PATH = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+)
+sys.path.insert(0, OPRO_ROOT_PATH)
+
 import google.generativeai as palm
 import numpy as np
 import openai
 from absl import app, flags
 
 from opro import prompt_utils
-
-OPRO_ROOT_PATH = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-)
-sys.path.insert(0, OPRO_ROOT_PATH)
 
 
 _OPENAI_API_KEY = flags.DEFINE_string("openai_api_key", "", "The OpenAI API key.")

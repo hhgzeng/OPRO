@@ -44,6 +44,11 @@ import json
 import os
 import sys
 
+OPRO_ROOT_PATH = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+)
+sys.path.insert(0, OPRO_ROOT_PATH)
+
 import google.generativeai as palm
 import numpy as np
 import openai
@@ -52,11 +57,6 @@ from absl import app, flags
 
 from opro import prompt_utils
 from opro.evaluation import eval_utils
-
-OPRO_ROOT_PATH = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-)
-sys.path.insert(0, OPRO_ROOT_PATH)
 
 ROOT_DATA_FOLDER_PATH = os.path.join(OPRO_ROOT_PATH, "data")
 
